@@ -1676,4 +1676,4 @@ static int play_a1534 (struct hda_codec *codec) {
 	return 0;
 }
 
-#include "patch_cirrus_a1534_pcm.h"
+#include "cs420x_a1534_pcm.h"

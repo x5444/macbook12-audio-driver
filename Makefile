@@ -7,13 +7,13 @@ endif
 KERNELBUILD := $(KERNELDIR)/build
 
 all:
-	make -C $(KERNELBUILD) M=$(shell pwd)/build/hda modules
+	make -C $(KERNELBUILD) M=$(shell pwd)/build/hda/codecs/cirrus modules
 
 clean:
-	make -C $(KERNELBUILD) M=$(shell pwd)/build/hda clean
+	make -C $(KERNELBUILD) M=$(shell pwd)/build/hda/codecs/cirrus clean
 
 ifndef KERNELRELEASE
 install:
-	cp $(shell pwd)/build/hda/snd-hda-codec-cirrus.ko $(KERNELDIR)/updates
+	cp $(shell pwd)/build/hda/codecs/cirrus/snd-hda-codec-cs420x.ko $(KERNELDIR)/updates
 	depmod -a
 endif

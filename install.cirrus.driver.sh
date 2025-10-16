@@ -50,10 +50,10 @@ fi
 # remove old kernel tar.xz archives
 find build/ -type f | grep -E linux.*.tar.xz | grep -v $kernel_version.tar.xz | xargs rm -f
 
-tar --strip-components=3 -xvf $build_dir/linux-$kernel_version.tar.xz --directory=build/ linux-$kernel_version/sound/pci/hda
-mv $hda_dir/Makefile $hda_dir/Makefile.orig
-mv $hda_dir/patch_cirrus.c $hda_dir/patch_cirrus.c.orig
-cp $patch_dir/Makefile $patch_dir/patch_cirrus.c $patch_dir/patch_cirrus_a1534_setup.h $patch_dir/patch_cirrus_a1534_pcm.h $hda_dir/
+tar --strip-components=2 -xvf $build_dir/linux-$kernel_version.tar.xz --directory=build/ linux-$kernel_version/sound/hda
+mv $hda_dir/codecs/cirrus/Makefile $hda_dir/codecs/cirrus/Makefile.orig
+mv $hda_dir/codecs/cirrus/cs420x.c $hda_dir/codecs/cirrus/cs420x.c.orig
+cp $patch_dir/Makefile $patch_dir/cs420x.c $patch_dir/cs420x_a1534_setup.h $patch_dir/cs420x_a1534_pcm.h $hda_dir/codecs/cirrus
 
 # if kernel version is >= 6.12 then change
 # snd_pci_quirk to hda_quirk
@@ -61,8 +61,8 @@ cp $patch_dir/Makefile $patch_dir/patch_cirrus.c $patch_dir/patch_cirrus_a1534_s
 # but leave alone SND_PCI_QUIRK_VENDOR
 
 if (( major_version > 6 || (major_version == 6 && minor_version >= 12) )); then
-   sed -i 's/snd_pci_quirk/hda_quirk/' $hda_dir/patch_cirrus.c
-   sed -i 's/SND_PCI_QUIRK\b/HDA_CODEC_QUIRK/' $hda_dir/patch_cirrus.c
+   sed -i 's/snd_pci_quirk/hda_quirk/' $hda_dir/codecs/cirrus/cs420x.c
+   sed -i 's/SND_PCI_QUIRK\b/HDA_CODEC_QUIRK/' $hda_dir/codecs/cirrus/cs420x.c
 fi
 
 if (( major_version == 6 && minor_version <= 11 )); then
@@ -74,9 +74,9 @@ fi
 # ktime_get_real_ts64 to getnstimeofday
 
 if [ $major_minor -lt 56 ]; then
-   sed -i 's/timespec64/timespec/' $hda_dir/patch_cirrus.c
-   sed -i 's/timespec64/timespec/' $hda_dir/patch_cirrus_a1534_pcm.h
-   sed -i 's/ktime_get_real_ts64/getnstimeofday/' $hda_dir/patch_cirrus_a1534_pcm.h
+   sed -i 's/timespec64/timespec/' $hda_dir/codecs/cirrus/cs420x.c
+   sed -i 's/timespec64/timespec/' $hda_dir/codecs/cirrus/cs420x_a1534_pcm.h
+   sed -i 's/ktime_get_real_ts64/getnstimeofday/' $hda_dir/codecs/cirrus/cs420x_a1534_pcm.h
 fi
 
 update_dir="/lib/modules/$(uname -r)/updates"
