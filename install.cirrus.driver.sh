@@ -22,7 +22,7 @@ elif [[ $dkms_action == 'remove' ]]; then
 fi
 
 [[ -n $dkms_kernel ]] && uname_r=$dkms_kernel || uname_r=$(uname -r)
-kernel_version=$(echo $uname_r | cut -d '-' -f1) #ie 6.4.15
+kernel_version=$(echo $uname_r | cut -d '-' -f1 | cut -d '_' -f1) #ie 6.4.15
 
 major_version=$(echo $kernel_version | cut -d '.' -f1)
 minor_version=$(echo $kernel_version | cut -d '.' -f2)
@@ -50,22 +50,54 @@ fi
 # remove old kernel tar.xz archives
 find build/ -type f | grep -E linux.*.tar.xz | grep -v $kernel_version.tar.xz | xargs rm -f
 
-tar --strip-components=2 -xvf $build_dir/linux-$kernel_version.tar.xz --directory=build/ linux-$kernel_version/sound/hda
-mv $hda_dir/codecs/cirrus/Makefile $hda_dir/codecs/cirrus/Makefile.orig
-mv $hda_dir/codecs/cirrus/cs420x.c $hda_dir/codecs/cirrus/cs420x.c.orig
-cp $patch_dir/Makefile $patch_dir/cs420x.c $patch_dir/cs420x_a1534_setup.h $patch_dir/cs420x_a1534_pcm.h $hda_dir/codecs/cirrus
+if (( major_version > 6 || (major_version == 6 && minor_version >= 17) )); then
+    makefile_name="Makefile_cs420x"
+    tar --strip-components=2 -xvf $build_dir/linux-$kernel_version.tar.xz --directory=build/ linux-$kernel_version/sound/hda
+    mv $hda_dir/codecs/cirrus/Makefile $hda_dir/codecs/cirrus/Makefile.orig
+    mv $hda_dir/codecs/cirrus/cs420x.c $hda_dir/codecs/cirrus/cs420x.c.orig
+    cp $patch_dir/cs420x.c $patch_dir/patch_cirrus_a1534_setup.h $patch_dir/patch_cirrus_a1534_pcm.h $hda_dir/codecs/cirrus
+    cp $patch_dir/$makefile_name $hda_dir/codecs/cirrus/Makefile
+else
+    makefile_name="Makefile_cirrus"
+    tar --strip-components=3 -xvf $build_dir/linux-$kernel_version.tar.xz --directory=build/ linux-$kernel_version/sound/pci/hda
+    mv $hda_dir/Makefile $hda_dir/Makefile.orig
+    mv $hda_dir/patch_cirrus.c $hda_dir/patch_cirrus.c.orig
+    cp $patch_dir/patch_cirrus.c $patch_dir/patch_cirrus_a1534_setup.h $patch_dir/patch_cirrus_a1534_pcm.h $hda_dir/
+    cp $patch_dir/$makefile_name $hda_dir/Makefile
+fi
 
-# if kernel version is >= 6.12 then change
+# if kernel version is 6.17 and beyond, replace the .free callback with .remove
+if (( major_version > 6 || (major_version == 6 && minor_version >= 17) )); then
+   sed -i 's/\.free/.remove/' $hda_dir/codecs/cirrus/patch_cirrus_a1534_pcm.h
+fi
+
+# if kernel version is between 6.12 and 6.16 then change
+# snd_pci_quirk to hda_quirk
 # SND_PCI_QUIRK to HDA_CODEC_QUIRK
 # but leave alone SND_PCI_QUIRK_VENDOR
 
-if (( major_version > 6 || (major_version == 6 && minor_version >= 12) )); then
-   sed -i 's/SND_PCI_QUIRK\b/HDA_CODEC_QUIRK/' $hda_dir/codecs/cirrus/cs420x.c
+if (( major_version == 6 && minor_version >= 12 && minor_version < 17 )); then
+   sed -i 's/snd_pci_quirk/hda_quirk/' $hda_dir/patch_cirrus.c
+   sed -i 's/SND_PCI_QUIRK\b/HDA_CODEC_QUIRK/' $hda_dir/patch_cirrus.c
+fi
+
+if (( major_version == 6 && minor_version <= 11 )); then
+   sed -i 's/hda_quirk/snd_pci_quirk/' $hda_dir/patch_cirrus.c
+fi
+
+# if kernel version is < 5.6 then change
+# timespec64 to timespec
+# ktime_get_real_ts64 to getnstimeofday
+
+if [ $major_minor -lt 56 ]; then
+   sed -i 's/timespec64/timespec/' $hda_dir/patch_cirrus.c
+   sed -i 's/timespec64/timespec/' $hda_dir/patch_cirrus_a1534_pcm.h
+   sed -i 's/ktime_get_real_ts64/getnstimeofday/' $hda_dir/patch_cirrus_a1534_pcm.h
 fi
 
 update_dir="/lib/modules/$(uname -r)/updates"
 [[ ! -d $update_dir ]] && mkdir $update_dir
-make
-make install
+make -f $makefile_name
+make -f $makefile_name install
 echo -e "\ncontents of $update_dir"
 ls -lA $update_dir
